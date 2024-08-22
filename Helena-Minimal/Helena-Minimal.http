@@ -1,0 +1,6 @@
+@Helena_Minimal_HostAddress = http://localhost:5263
+
+GET {{Helena_Minimal_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
