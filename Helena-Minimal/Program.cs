@@ -71,7 +71,6 @@ app.MapGet("/medications", async () =>
 app.MapGet("/medications/{date}", async (DateOnly date) =>
 {
 
-    Console.WriteLine("Acessado");
     await using var dataSource = NpgsqlDataSource.Create(connectionString);
 
     var query = @"
