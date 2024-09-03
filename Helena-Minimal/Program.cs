@@ -1,6 +1,14 @@
-using Helena_Minimal.Properties.Models;
+using Helena_Minimal.Context;
+using Helena_Minimal.DTO;
+using Helena_Minimal.Models;
+using Helena_Minimal.Services;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using Microsoft.EntityFrameworkCore;
 using Npgsql;
-using System.Text.Json;
+using NpgsqlTypes;
+using System.Linq;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,12 +24,16 @@ builder.Services.AddCors(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
+builder.Services.AddDbContext<AppDbContext>(options =>
+{
+    options.UseNpgsql(connectionString);
+});
+
+builder.Services.AddScoped<DateTimeCreation>();
 
 var app = builder.Build();
-
-
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -34,79 +46,134 @@ app.UseCors();
 
 app.UseHttpsRedirection();
 
-app.MapGet("/medications", async () =>
+app.MapGet("/medications", async (AppDbContext context) =>
 {
-    await using var dataSource = NpgsqlDataSource.Create(connectionString);
 
-    await using var cmd = dataSource.CreateCommand("SELECT * FROM medication");
-    await using var reader = await cmd.ExecuteReaderAsync();
+    var query = from medication in context.Medications
+                join doctor in context.Doctors on medication.DoctorId equals doctor.Id
+                join time in context.Times on medication.Id equals time.MedicationId
+                group new { medication, doctor, time } by new
+                {
+                    medication.Id,
+                    MedicationName = medication.Name,
+                    medication.Lab,
+                    medication.Type,
+                    medication.Dosage,
+                    medication.Notes,
+                    medication.Start,
+                    medication.End,
+                    medication.FrequencyType,
+                    medication.Recurrency,
+                    DoctorName = doctor.Name,
+                    doctor.Specialty,
+                    medication.IndicatedFor
+                } into g
+                select new MedicationWithDoctor
+                {
+                    Id = g.Key.Id,
+                    Name = g.Key.MedicationName,
+                    Lab = g.Key.Lab,
+                    Type = g.Key.Type,
+                    Dosage = g.Key.Dosage,
+                    Notes = g.Key.Notes,
+                    Start = g.Key.Start,
+                    End = g.Key.End,
+                    FrequencyType = g.Key.FrequencyType,
+                    Recurrency = g.Key.Recurrency,
+                    DoctorName = g.Key.DoctorName,
+                    DoctorSpecialty = g.Key.Specialty,
+                    IndicatedFor = g.Key.IndicatedFor,
+                    Times = g.Select(x => new TimeDTO
+                    {
+                        DateTime = x.time.DateTime,
+                        IsTaken = x.time.IsTaken,
+                    }).ToList()
+                };
 
-    var medications = new List<Medication>();
+    var result = await query.ToListAsync();
 
-    while (await reader.ReadAsync())
-    {
-        var medication = new Medication
-        {
-            Id = reader.GetGuid(reader.GetOrdinal("Id")),
-            Name = reader.GetString(reader.GetOrdinal("Name")),
-            Lab = reader.GetString(reader.GetOrdinal("Lab")),
-            Type = reader.GetString(reader.GetOrdinal("Type")),
-            Dosage = reader.GetString(reader.GetOrdinal("Dosage")),
-            Notes = reader.GetString(reader.GetOrdinal("Notes")),
-            Img = reader.GetString(reader.GetOrdinal("Img")),
-            Start = reader.GetFieldValue<DateOnly>(reader.GetOrdinal("Start")),
-            End = reader.GetFieldValue<DateOnly>(reader.GetOrdinal("End")),
-            FrequencyType = Enum.Parse<FrequencyType>(reader.GetString(reader.GetOrdinal("FrequencyType"))),
-            Recurrency = reader.GetInt32(reader.GetOrdinal("Recurrency"))
-        };
-
-        medications.Add(medication);
-    }
-
-    //var json = JsonSerializer.Serialize(medications);
-    return Results.Json(medications);
+    return result;
 });
 
 // get by day
-app.MapGet("/medications/{date}", async (DateOnly date) =>
+app.MapGet("/medications/{date}", async ([FromRoute] DateOnly date, AppDbContext context) =>
 {
 
-    await using var dataSource = NpgsqlDataSource.Create(connectionString);
 
-    var query = @"
-        SELECT t.*, m.name, m.dosage, m.notes
-        FROM times t
-        JOIN medication m ON t.medicationId = m.Id
-        WHERE t.date_time::date = @Date";
-
-    await using var cmd = dataSource.CreateCommand(query);
-    cmd.Parameters.AddWithValue("Date", date);
-
-    await using var reader = await cmd.ExecuteReaderAsync();
-
-    var results = new List<object>();
-
-    while (await reader.ReadAsync())
-    {
-        var time = new
+    var query = context.Medications
+        .Where(m => context.Times.Any(t => t.MedicationId == m.Id && t.DateTime.Date == date.ToDateTime(TimeOnly.MinValue).ToUniversalTime().Date))
+        .Select(medication => new DayMedicationDTO
         {
-            Id = reader.GetGuid(reader.GetOrdinal("Id")),
-            MedicationId = reader.GetGuid(reader.GetOrdinal("MedicationId")),
-            Date = reader.GetFieldValue<DateTime>(reader.GetOrdinal("date_time")),
-            Medication = new
-            {
-                Name = reader.GetString(reader.GetOrdinal("Name")),
-                Dosage = reader.GetString(reader.GetOrdinal("Dosage")),
-                Notes = reader.GetString(reader.GetOrdinal("Notes")),
-            }
-        };
+            MedicationId = medication.Id,
+            Name = medication.Name,
+            Notes = medication.Notes,
+            Dosage = medication.Dosage,
+            Times = context.Times
+                        .Where(t => t.MedicationId == medication.Id && t.DateTime.Date == date.ToDateTime(TimeOnly.MinValue).ToUniversalTime().Date).OrderBy(t => t.DateTime)
+                        .Select(t => new TimeDTO
+                        {
+                    
+                            DateTime = DateTime.SpecifyKind(t.DateTime, DateTimeKind.Utc),  // Convertendo para UTC
+                            IsTaken = t.IsTaken
+                        }).ToList()
+        });
 
-        results.Add(time);
-    }
+    return await query.ToListAsync();
 
-    return Results.Json(results);
 });
 
+app.MapGet("/doctors", async (AppDbContext context) =>
+{
+    var doctors = await context.Doctors.Select(doctor => new Doctor
+    {
+        Id = doctor.Id,
+        Name = doctor.Name,
+        Specialty = doctor.Specialty
+
+    }).ToListAsync();
+
+    return doctors;
+});
+
+app.MapPost("/medications", async ([FromBody] NewMedDTO newMed, AppDbContext context, DateTimeCreation dateTimeService) =>
+{
+    var medication = new Medication
+    {
+        Id = Guid.NewGuid(),
+        Name = newMed.Name,
+        Lab = newMed.Lab,
+        Type = newMed.Type,
+        Dosage = newMed.Dosage,
+        Notes = newMed.Notes,
+        Img = newMed.Img,
+        Start = DateOnly.Parse(newMed.Start),
+        End = DateOnly.Parse(newMed.End),
+        FrequencyType = (FrequencyType)newMed.FrequencyType,
+        Recurrency = newMed.Recurrency,
+        DoctorId = newMed.DoctorId,
+    };
+
+    List<NewTimeDTO> newMedTimes = newMed.Times;
+    List<Times> timesToAdd = new List<Times>();
+
+    switch (newMed.FrequencyType)
+    {
+        case 0:
+            timesToAdd = dateTimeService.CreateDailyTimes(medication.Id, medication.Start, medication.End, newMedTimes);
+            break;
+    }
+
+    context.Medications.Add(medication);
+
+    foreach (var item in timesToAdd)
+    {
+        context.Times.Add(item);
+    }
+
+    await context.SaveChangesAsync();
+
+    return Results.Created($"/medications/{medication.Id}", medication);
+});
 
 app.Run();
 
