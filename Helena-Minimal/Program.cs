@@ -87,7 +87,7 @@ app.MapGet("/medications", async (AppDbContext context) =>
                     {
                         DateTime = x.time.DateTime,
                         IsTaken = x.time.IsTaken,
-                    }).ToList()
+                    }).OrderBy(t => t.DateTime).ToList()
                 };
 
     var result = await query.ToListAsync();
@@ -112,7 +112,7 @@ app.MapGet("/medications/{date}", async ([FromRoute] DateOnly date, AppDbContext
                         .Where(t => t.MedicationId == medication.Id && t.DateTime.Date == date.ToDateTime(TimeOnly.MinValue).ToUniversalTime().Date).OrderBy(t => t.DateTime)
                         .Select(t => new TimeDTO
                         {
-                    
+                            Id = t.Id,
                             DateTime = DateTime.SpecifyKind(t.DateTime, DateTimeKind.Utc),  // Convertendo para UTC
                             IsTaken = t.IsTaken
                         }).ToList()
@@ -161,6 +161,10 @@ app.MapPost("/medications", async ([FromBody] NewMedDTO newMed, AppDbContext con
         case 0:
             timesToAdd = dateTimeService.CreateDailyTimes(medication.Id, medication.Start, medication.End, newMedTimes);
             break;
+        case 1:
+            timesToAdd = dateTimeService.CreateWeeklyTimes(medication.Id, medication.Start, medication.End, newMedTimes);
+            break;
+
     }
 
     context.Medications.Add(medication);

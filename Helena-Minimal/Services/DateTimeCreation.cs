@@ -43,5 +43,54 @@ public class DateTimeCreation
         return newTimeList;
 
     }
+
+    public List<Times> CreateWeeklyTimes(Guid medId, DateOnly start, DateOnly end, List<NewTimeDTO> times)
+    {
+        List<Times> newTimes = new List<Times>();
+        int timeDifference = end.DayNumber - start.DayNumber + 1;
+       
+
+        for (int i = 0; i < timeDifference; i++)
+        {
+            var currentDay = start.AddDays(i);
+
+            foreach (var item in times)
+            {
+              
+              
+                if (item.WeekDay.Contains((int)currentDay.DayOfWeek)) {
+
+                    foreach (var item1 in item.Time)
+                    {
+                        TimeOnly convertedNewTime = TimeOnly.Parse(item1);
+                        DateTime correctDateTime = currentDay.ToDateTime(convertedNewTime);
+
+                        correctDateTime = DateTime.SpecifyKind(correctDateTime, DateTimeKind.Utc);
+
+                        var timeToAdd = new Times()
+                        {
+                            Id = Guid.NewGuid(),
+                            MedicationId = medId,
+                            IsTaken = false,
+                            DateTime = correctDateTime,
+
+                        };
+
+                        newTimes.Add(timeToAdd);
+                    }
+
+                 
+
+                }
+
+
+        }
+
+        }
+
+        return newTimes;
+
+
+    }
 }
 
