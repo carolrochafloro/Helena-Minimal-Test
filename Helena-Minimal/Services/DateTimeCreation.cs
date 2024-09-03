@@ -6,13 +6,15 @@ namespace Helena_Minimal.Services;
 public class DateTimeCreation
 {
 
+    /* Inserir exceptions para agendamento maior do que X anos a partir da data atual e incluir blocos try/catch */
+
     public List<Times> CreateDailyTimes(Guid medId, DateOnly start, DateOnly end, List<NewTimeDTO> times)
     {
 
         List<Times> newTimeList = new List<Times>();
         int timeDifference = end.DayNumber - start.DayNumber + 1;
 
-       for (int i = 0; i < timeDifference; i++)
+        for (int i = 0; i < timeDifference; i++)
         {
             var currentDay = start.AddDays(i);
 
@@ -48,7 +50,7 @@ public class DateTimeCreation
     {
         List<Times> newTimes = new List<Times>();
         int timeDifference = end.DayNumber - start.DayNumber + 1;
-       
+
 
         for (int i = 0; i < timeDifference; i++)
         {
@@ -56,14 +58,19 @@ public class DateTimeCreation
 
             foreach (var item in times)
             {
-              
-              
-                if (item.WeekDay.Contains((int)currentDay.DayOfWeek)) {
+
+                if (item.WeekDay.Contains((int)currentDay.DayOfWeek))
+                {
 
                     foreach (var item1 in item.Time)
                     {
                         TimeOnly convertedNewTime = TimeOnly.Parse(item1);
                         DateTime correctDateTime = currentDay.ToDateTime(convertedNewTime);
+
+                        if (correctDateTime.Year > 2026)
+                        {
+                            break;
+                        }
 
                         correctDateTime = DateTime.SpecifyKind(correctDateTime, DateTimeKind.Utc);
 
@@ -79,18 +86,74 @@ public class DateTimeCreation
                         newTimes.Add(timeToAdd);
                     }
 
-                 
-
                 }
 
-
-        }
+            }
 
         }
 
         return newTimes;
-
-
     }
-}
 
+    public List<Times> CreateMonthlyAndYearlyTimes(Guid medId, DateOnly start, DateOnly end, List<NewTimeDTO> times)
+    {
+        /* Aqui preciso pegar os dias e repetir pelo time interval */
+        List<Times> newTimes = new List<Times>();
+        int timeInterval = end.DayNumber - start.DayNumber + 1;
+
+
+        foreach (var time in times)
+        {
+
+            foreach (var item in time.Dates)
+            {
+
+                foreach (var item1 in time.Time)
+                {
+                    TimeOnly convertedTime = TimeOnly.Parse(item1);
+                    var day = item.Day;
+                    var month = item.Month;
+                    var year = item.Year;
+
+                    for (int i = 0; i < timeInterval; i++)
+                    {
+                        DateOnly theDate = new DateOnly(year, month, day).AddMonths(i);
+
+                        if (theDate > end)
+                        {
+                            break;
+                        }
+
+                        if (theDate.Year > 2026)
+                        {
+
+                            break;
+                        }
+
+
+                        DateTime correctDate = item.ToDateTime(convertedTime);
+                        correctDate = DateTime.SpecifyKind(correctDate, DateTimeKind.Utc);
+
+                            var timeToAdd = new Times
+                            {
+                                Id = Guid.NewGuid(),
+                                DateTime = correctDate,
+                                MedicationId = medId,
+                                IsTaken = false
+                            };
+
+                            newTimes.Add(timeToAdd);
+                        
+                    }
+
+                }
+
+            }
+
+            
+        }
+
+        return newTimes;
+    }
+
+}
