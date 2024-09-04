@@ -97,7 +97,7 @@ public class DateTimeCreation
 
     public List<Times> CreateMonthlyAndYearlyTimes(Guid medId, DateOnly start, DateOnly end, List<NewTimeDTO> times)
     {
-        /* Aqui preciso pegar os dias e repetir pelo time interval */
+        /* Criar novo método para yearly, está adicionando meses - ou add verificação, mas precisaria receber frequency type */
         List<Times> newTimes = new List<Times>();
         int timeInterval = end.DayNumber - start.DayNumber + 1;
 
