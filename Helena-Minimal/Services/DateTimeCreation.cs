@@ -95,7 +95,7 @@ public class DateTimeCreation
         return newTimes;
     }
 
-    public List<Times> CreateMonthlyAndYearlyTimes(Guid medId, DateOnly start, DateOnly end, List<NewTimeDTO> times)
+    public List<Times> CreateMonthlyTimes(Guid medId, DateOnly start, DateOnly end, List<NewTimeDTO> times)
     {
         /* Criar novo método para yearly, está adicionando meses - ou add verificação, mas precisaria receber frequency type */
         List<Times> newTimes = new List<Times>();
@@ -151,6 +151,65 @@ public class DateTimeCreation
             }
 
             
+        }
+
+        return newTimes;
+    }
+
+    public List<Times> CreateYearlyTimes(Guid medId, DateOnly start, DateOnly end, List<NewTimeDTO> times)
+    {
+        var newTimes = new List<Times>();
+        int timeInterval = end.DayNumber - start.DayNumber + 1;
+
+        foreach (var time in times)
+        {
+
+            foreach (var item in time.Dates)
+            {
+
+                foreach (var item1 in time.Time)
+                {
+                    TimeOnly convertedTime = TimeOnly.Parse(item1);
+                    var day = item.Day;
+                    var month = item.Month;
+                    var year = item.Year;
+
+                    for (int i = 0; i < timeInterval; i++)
+                    {
+                        DateOnly theDate = new DateOnly(year, month, day).AddYears(i);
+
+                        if (theDate > end)
+                        {
+                            break;
+                        }
+
+                        if (theDate.Year > 2026)
+                        {
+
+                            break;
+                        }
+
+
+                        DateTime correctDate = item.ToDateTime(convertedTime);
+                        correctDate = DateTime.SpecifyKind(correctDate, DateTimeKind.Utc);
+
+                        var timeToAdd = new Times
+                        {
+                            Id = Guid.NewGuid(),
+                            DateTime = correctDate,
+                            MedicationId = medId,
+                            IsTaken = false
+                        };
+
+                        newTimes.Add(timeToAdd);
+
+                    }
+
+                }
+
+            }
+
+
         }
 
         return newTimes;

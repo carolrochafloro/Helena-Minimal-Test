@@ -165,10 +165,10 @@ app.MapPost("/medications", async ([FromBody] NewMedDTO newMed, AppDbContext con
             timesToAdd = dateTimeService.CreateWeeklyTimes(medication.Id, medication.Start, medication.End, newMedTimes);
             break;
         case 2:
-            timesToAdd = dateTimeService.CreateMonthlyAndYearlyTimes(medication.Id, medication.Start, medication.End, newMedTimes);
+            timesToAdd = dateTimeService.CreateMonthlyTimes(medication.Id, medication.Start, medication.End, newMedTimes);
             break;
         case 3:
-            timesToAdd = dateTimeService.CreateMonthlyAndYearlyTimes(medication.Id, medication.Start, medication.End, newMedTimes);
+            timesToAdd = dateTimeService.CreateYearlyTimes(medication.Id, medication.Start, medication.End, newMedTimes);
             break;
     }
 
