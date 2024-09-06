@@ -160,6 +160,7 @@ public class DateTimeCreation
     {
         var newTimes = new List<Times>();
         int timeInterval = end.DayNumber - start.DayNumber + 1;
+        int count = 0;
 
         foreach (var time in times)
         {
@@ -174,23 +175,18 @@ public class DateTimeCreation
                     var month = item.Month;
                     var year = item.Year;
 
-                    for (int i = 0; i < timeInterval; i++)
+                    while (year < 2027)
                     {
-                        DateOnly theDate = new DateOnly(year, month, day).AddYears(i);
+                        
+                        DateOnly theDate = new DateOnly(year, month, day).AddYears(count);
 
                         if (theDate > end)
                         {
                             break;
                         }
 
-                        if (theDate.Year > 2026)
-                        {
 
-                            break;
-                        }
-
-
-                        DateTime correctDate = item.ToDateTime(convertedTime);
+                        DateTime correctDate = theDate.ToDateTime(convertedTime);
                         correctDate = DateTime.SpecifyKind(correctDate, DateTimeKind.Utc);
 
                         var timeToAdd = new Times
@@ -202,7 +198,7 @@ public class DateTimeCreation
                         };
 
                         newTimes.Add(timeToAdd);
-
+                        count++;
                     }
 
                 }
