@@ -85,7 +85,7 @@ app.MapGet("/medications", async (AppDbContext context) =>
                     IndicatedFor = g.Key.IndicatedFor,
                     Times = g.Select(x => new TimeDTO
                     {
-                        DateTime = x.time.DateTime,
+                        DateTime = x.time.DateTime.ToLocalTime(),
                         IsTaken = x.time.IsTaken,
                     }).OrderBy(t => t.DateTime).ToList()
                 };
@@ -113,7 +113,7 @@ app.MapGet("/medications/{date}", async ([FromRoute] DateOnly date, AppDbContext
                         .Select(t => new TimeDTO
                         {
                             Id = t.Id,
-                            DateTime = DateTime.SpecifyKind(t.DateTime, DateTimeKind.Utc),  // Convertendo para UTC
+                            DateTime = t.DateTime.ToLocalTime(),
                             IsTaken = t.IsTaken
                         }).ToList()
         });
